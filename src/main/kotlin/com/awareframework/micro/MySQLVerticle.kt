@@ -24,6 +24,14 @@ class MySQLVerticle : AbstractVerticle() {
 
   private lateinit var parameters: JsonObject
   private lateinit var sqlClient: MySQLPool
+  private var enableDebug:Boolean = true
+
+  //add by HY
+  fun debug(action:String,msg:String){
+    if(enableDebug){
+      println("'$action': '$msg'")
+    }
+  }
 
   override fun start(startPromise: Promise<Void>?) {
     super.start(startPromise)
@@ -111,8 +119,13 @@ class MySQLVerticle : AbstractVerticle() {
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
         // https://access.redhat.com/documentation/ja-jp/red_hat_build_of_eclipse_vert.x/4.0/html/eclipse_vert.x_4.0_migration_guide/changes-in-vertx-jdbc-client_changes-in-client-components#running_queries_on_managed_connections
+        val sql = "SELECT * FROM $table WHERE device_id = '$device_id' AND timestamp between $start AND $end ORDER BY timestamp ASC"
+
+        //add by HY
+        debug("getData",sql)
+
         connection
-          .query("SELECT * FROM $table WHERE device_id = '$device_id' AND timestamp between $start AND $end ORDER BY timestamp ASC")
+          .query(sql)
           .execute()
           .onFailure { e ->
             println("Failed to retrieve data: ${e.message}")
@@ -140,6 +153,9 @@ class MySQLVerticle : AbstractVerticle() {
           val entry = data.getJsonObject(i)
           val updateItem =
             "UPDATE '$table' SET data = $entry WHERE device_id = '$device_id' AND timestamp = ${entry.getDouble("timestamp")}"
+
+          //add by HY
+          debug("updateData",updateItem)
 
           // https://access.redhat.com/documentation/ja-jp/red_hat_build_of_eclipse_vert.x/4.0/html/eclipse_vert.x_4.0_migration_guide/changes-in-vertx-jdbc-client_changes-in-client-components#running_queries_on_managed_connections
           connection.query(updateItem)
@@ -173,6 +189,10 @@ class MySQLVerticle : AbstractVerticle() {
           "DELETE from '$table' WHERE device_id = '$device_id' AND timestamp in (${timestamps.stream().map(Any::toString).collect(
             Collectors.joining(",")
           )})"
+
+        //add by HY
+        debug("deleteData",deleteBatch)
+
         connection.query(deleteBatch)
           .execute()
           .onFailure { e ->
@@ -197,7 +217,12 @@ class MySQLVerticle : AbstractVerticle() {
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connect = connectionResult.result()
-        connect.query("CREATE TABLE IF NOT EXISTS `$table` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`))")
+        val sql = "CREATE TABLE IF NOT EXISTS `$table` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`))"
+
+        //add by HY
+        debug("createTable",sql)
+
+        connect.query(sql)
           .execute()
           .onFailure { e ->
             promise.fail(e.message)
@@ -234,6 +259,10 @@ class MySQLVerticle : AbstractVerticle() {
               "INSERT INTO `$table` (`device_id`,`timestamp`,`data`) VALUES ${values.stream().map(Any::toString).collect(
                 Collectors.joining(",")
               )}"
+
+            //add by HY
+            debug("insertData",insertBatch)
+
             connection.query(insertBatch)
               .execute()
               .onFailure { e ->

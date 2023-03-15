@@ -192,3 +192,4 @@ nbdist/
 #server config
 /aware-config.json
 /aware-config.json-backup
+cache/qrcode.png
