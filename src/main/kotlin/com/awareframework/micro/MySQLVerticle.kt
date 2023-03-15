@@ -29,7 +29,7 @@ class MySQLVerticle : AbstractVerticle() {
   //add by HY
   fun debug(action:String,msg:String){
     if(enableDebug){
-      println("'$action': '$msg'")
+      println("DEBUG_INFO - '$action': '$msg'")
     }
   }
 
@@ -249,30 +249,36 @@ class MySQLVerticle : AbstractVerticle() {
           if (connectionResult.succeeded()) {
             val connection = connectionResult.result()
             val rows = data.size()
-            val values = ArrayList<String>()
-            for (i in 0 until data.size()) {
-              val entry = data.getJsonObject(i)
-              // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
-              values.add("('$device_id', '${entry.getDouble("timestamp")}', '${StringEscapeUtils.escapeJavaScript(entry.encode())}')")
+            if(rows>0)
+            {
+              val values = ArrayList<String>()
+              for (i in 0 until data.size()) {
+                val entry = data.getJsonObject(i)
+                // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
+                values.add("('$device_id', '${entry.getDouble("timestamp")}', '${StringEscapeUtils.escapeJavaScript(entry.encode())}')")
+              }
+              val insertBatch =
+                "INSERT INTO `$table` (`device_id`,`timestamp`,`data`) VALUES ${values.stream().map(Any::toString).collect(
+                  Collectors.joining(",")
+                )}"
+
+              //add by HY
+              debug("insertData",insertBatch)
+
+              connection.query(insertBatch)
+                .execute()
+                .onFailure { e ->
+                  println("Failed to process batch: ${e.message}")
+                  connection.close()
+                }
+                .onSuccess { _ ->
+                  println("$device_id inserted to $table: $rows records")
+                  connection.close()
+                }
             }
-            val insertBatch =
-              "INSERT INTO `$table` (`device_id`,`timestamp`,`data`) VALUES ${values.stream().map(Any::toString).collect(
-                Collectors.joining(",")
-              )}"
-
-            //add by HY
-            debug("insertData",insertBatch)
-
-            connection.query(insertBatch)
-              .execute()
-              .onFailure { e ->
-                println("Failed to process batch: ${e.message}")
-                connection.close()
-              }
-              .onSuccess { _ ->
-                println("$device_id inserted to $table: $rows records")
-                connection.close()
-              }
+            else{
+              debug("insertData","$rows record in $table.")
+            }
           }
         }
       }

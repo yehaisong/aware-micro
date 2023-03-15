@@ -193,3 +193,9 @@ nbdist/
 /aware-config.json
 /aware-config.json-backup
 cache/qrcode.png
+aware-config-local.json
+aware-config-remote.json
+ca.pem
+client-key.pem
+client-cert.pem
+cache/qrcode.png
